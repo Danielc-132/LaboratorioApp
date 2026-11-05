@@ -8,3 +8,6 @@ Aplicación de escritorio en C# para la gestión de préstamos e inventario de e
 
 ## Problemas Conocidos
 - **Duplicidad de botones:** Se detectó duplicidad de eventos/controles en Form1.cs pendiente de corrección.
+
+## Faltante
+- ** Creación Y conexión con Base de datos
