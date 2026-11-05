@@ -1,10 +1,10 @@
-# ?? LaboratorioApp
+# LaboratorioApp
 
-AplicaciÛn de escritorio en C# para la gestiÛn de prÈstamos e inventario de equipos de laboratorio.
+Aplicaci√≥n de escritorio en C# para la gesti√≥n de pr√©stamos e inventario de equipos de laboratorio.
 
-## ?? Novedades v1.0.0
-- **Interfaz Gr·fica:** Implementada la GUI principal en Windows Forms (Form1.cs).
-- **GestiÛn de Inventario:** Control de disponibilidad, lÌmites de prÈstamos y validaciones en LaboratorioService.cs.
+## Novedades v1.0.0
+- **Interfaz Gr√°fica:** Implementada la GUI principal en Windows Forms (Form1.cs).
+- **Gesti√≥n de Inventario:** Control de disponibilidad, l√≠mites de pr√©stamos y validaciones en LaboratorioService.cs.
 
-## ?? Problemas Conocidos
-- **Duplicidad de botones:** Se detectÛ duplicidad de eventos/controles en Form1.cs pendiente de correcciÛn.
+## Problemas Conocidos
+- **Duplicidad de botones:** Se detect√≥ duplicidad de eventos/controles en Form1.cs pendiente de correcci√≥n.
