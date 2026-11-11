@@ -1,111 +1,119 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Data.Entity;
 using System.Linq;
+using LaboratorioApp.Data;
 using LaboratorioApp.Models;
 
 namespace LaboratorioApp.Services
 {
     public class LaboratorioService
     {
-        private List<Equipo> _equiposFisicos;
-        private List<Estudiante> _estudiantes;
-        private List<Prestamo> _prestamos;
-        private int _contadorPrestamos = 1;
+        private readonly LaboratorioContext _context;
 
         public LaboratorioService()
         {
-            // Inicializamos usando constructor de Equipo
-            _equiposFisicos = new List<Equipo>
+            _context = new LaboratorioContext();
+
+            // Seed Data: Inicializa equipos base en la BD si la tabla está vacía
+            if (!_context.Equipos.Any())
             {
-                new Equipo("EQ-01", "Osciloscopio Digital", 2),
-                new Equipo("EQ-02", "Multímetro", 3),
-                new Equipo("EQ-03", "Fuente de Poder", 1)
-            };
-            _estudiantes = new List<Estudiante>();
-            _prestamos = new List<Prestamo>();
+                _context.Equipos.Add(new Equipo("EQ-01", "Osciloscopio Digital", 2));
+                _context.Equipos.Add(new Equipo("EQ-02", "Multímetro", 3));
+                _context.Equipos.Add(new Equipo("EQ-03", "Fuente de Poder", 1));
+                _context.SaveChanges();
+            }
         }
 
-        public List<Equipo> ObtenerEquipos() => _equiposFisicos;
+        public List<Equipo> ObtenerEquipos()
+        {
+            return _context.Equipos.ToList();
+        }
 
-        public List<Prestamo> ObtenerPrestamosActivos() => _prestamos.Where(p => p.Estado != EstadoPrestamo.Devuelto).ToList();
+        public List<Prestamo> ObtenerPrestamosActivos()
+        {
+            return _context.Prestamos
+                .Where(p => p.Estado != EstadoPrestamo.Devuelto)
+                .ToList();
+        }
 
         public void RegistrarEstudiante(string id, string nombre)
         {
-            if (!_estudiantes.Any(e => e.IdEstudiante.Equals(id, StringComparison.OrdinalIgnoreCase)))
+            var estudianteExistente = _context.Estudiantes.FirstOrDefault(e => e.IdEstudiante == id);
+            if (estudianteExistente == null)
             {
-                // Usamos tu constructor de Estudiante
-                _estudiantes.Add(new Estudiante(id, nombre));
+                _context.Estudiantes.Add(new Estudiante(id, nombre));
+                _context.SaveChanges();
             }
         }
 
         public (bool Exito, string Mensaje) Prestar(string idEstudiante, string idEquipo, DateTime fechaInicio, int diasLimite = 7)
         {
-            var estudiante = _estudiantes.FirstOrDefault(e => e.IdEstudiante.Equals(idEstudiante, StringComparison.OrdinalIgnoreCase));
+            var estudiante = _context.Estudiantes.FirstOrDefault(e => e.IdEstudiante == idEstudiante);
             if (estudiante == null) return (false, "El estudiante no está registrado.");
 
-            var equipo = _equiposFisicos.FirstOrDefault(eq => eq.IdEquipo.Equals(idEquipo, StringComparison.OrdinalIgnoreCase));
+            var equipo = _context.Equipos.FirstOrDefault(eq => eq.IdEquipo == idEquipo);
             if (equipo == null) return (false, "El equipo no existe en el inventario.");
 
-            // Aprovechamos tu método Existente en la clase Equipo
             if (!equipo.EstaDisponible())
                 return (false, $"No hay unidades disponibles de {equipo.Nombre}.");
 
-            // Aprovechamos tu método existente en la clase Estudiante
-            if (estudiante.ConsultarPrestamosActivos().Count >= 3)
+            int prestamosActivosCount = _context.Prestamos
+                .Count(p => p.IdEstudiante == idEstudiante && (p.Estado == EstadoPrestamo.Activo || p.Estado == EstadoPrestamo.Atrasado));
+
+            if (prestamosActivosCount >= 3)
                 return (false, "El estudiante superó el límite de 3 préstamos activos.");
 
-            // Creamos el préstamo usando tu constructor
+            int totalPrestamos = _context.Prestamos.Count() + 1;
             var nuevoPrestamo = new Prestamo(
-                $"P-{_contadorPrestamos++:D3}",
+                $"P-{totalPrestamos:D3}",
                 idEstudiante,
                 idEquipo,
                 fechaInicio,
                 fechaInicio.AddDays(diasLimite)
             );
 
-            // Vinculamos las entidades y actualizamos contadores
-            nuevoPrestamo.Estudiante = estudiante;
-            nuevoPrestamo.Equipo = equipo;
-
             equipo.CantidadPrestados++;
-            estudiante.HistorialPrestamos.Add(nuevoPrestamo);
-            _prestamos.Add(nuevoPrestamo);
+            _context.Prestamos.Add(nuevoPrestamo);
+            _context.SaveChanges();
 
             return (true, $"Préstamo exitoso. ID: {nuevoPrestamo.IdPrestamo}. Fecha Límite: {nuevoPrestamo.FechaLimite:yyyy-MM-dd}");
         }
 
         public (bool Exito, string Mensaje) Devolver(string idPrestamo, DateTime fechaDevolucion)
         {
-            var prestamo = _prestamos.FirstOrDefault(p => p.IdPrestamo.Equals(idPrestamo, StringComparison.OrdinalIgnoreCase));
+            var prestamo = _context.Prestamos.FirstOrDefault(p => p.IdPrestamo == idPrestamo);
             if (prestamo == null) return (false, "Préstamo no encontrado. Verifique el ID.");
 
             if (prestamo.Estado == EstadoPrestamo.Devuelto) return (false, "Este equipo ya fue devuelto previamente.");
 
-            prestamo.FechaDev = fechaDevolucion; // Usando tu propiedad FechaDev
+            prestamo.FechaDev = fechaDevolucion;
             prestamo.Estado = EstadoPrestamo.Devuelto;
 
-            // Liberamos el equipo disminuyendo los prestados
-            var equipo = _equiposFisicos.FirstOrDefault(e => e.IdEquipo.Equals(prestamo.IdEquipo, StringComparison.OrdinalIgnoreCase));
+            var equipo = _context.Equipos.FirstOrDefault(e => e.IdEquipo == prestamo.IdEquipo);
             if (equipo != null && equipo.CantidadPrestados > 0)
             {
                 equipo.CantidadPrestados--;
             }
 
+            _context.SaveChanges();
             return (true, "Devolución registrada correctamente.");
         }
 
         public List<string> VerificarMora(DateTime fechaActual)
         {
             var alertas = new List<string>();
-            foreach (var prestamo in _prestamos.Where(p => p.Estado != EstadoPrestamo.Devuelto))
+            var prestamosActivos = _context.Prestamos.Where(p => p.Estado != EstadoPrestamo.Devuelto).ToList();
+
+            foreach (var prestamo in prestamosActivos)
             {
-                // Aprovechamos tu método EvalAtrasado de la clase Prestamo
                 if (prestamo.EvalAtrasado(fechaActual))
                 {
                     prestamo.Estado = EstadoPrestamo.Atrasado;
                     alertas.Add($"El préstamo {prestamo.IdPrestamo} del estudiante {prestamo.IdEstudiante} está vencido.");
                 }
             }
+            _context.SaveChanges();
             return alertas;
         }
     }
